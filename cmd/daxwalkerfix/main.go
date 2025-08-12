@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	timeout := flag.Int("timeout", 5, "Shutdown after N minutes of inactivity")
+	timeout := flag.Int("timeout", 30, "Shutdown after N minutes of inactivity")
 	debug := flag.Bool("debug", false, "Enable debug logging")
 	flag.Parse()
 
