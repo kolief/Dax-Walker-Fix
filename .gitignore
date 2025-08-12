@@ -13,11 +13,6 @@ proxy.txt
 # Go build artifacts
 go.sum
 
-# Claude related files
-CLAUDE.md
-.claude/
-claude-*
-*claude*
 
 # OS generated files
 .DS_Store
