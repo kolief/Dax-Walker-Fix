@@ -21,10 +21,10 @@ func main() {
 	flag.Parse()
 
 	output.InitLogger()
-	fmt.Println("Dax Walker Fix - Hosts file interceptor")
+	fmt.Println("Dax Walker Fix by Kolief - Hosts file interceptor")
 	fmt.Println("Redirects walker.dax.cloud through SOCKS5 proxies")
 	fmt.Println()
-	output.Info("Dax Walker Fix - Hosts file interceptor")
+	output.Info("Dax Walker Fix by Kolief - Hosts file interceptor")
 	output.Info("Redirects walker.dax.cloud through SOCKS5 proxies")
 
 	fmt.Print("Loading proxies...")
