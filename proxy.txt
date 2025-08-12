@@ -1,0 +1,16 @@
+# SOCKS5 proxy list (one per line)
+#
+# Formats supported:
+#   host:port
+#   username:password@host:port
+#
+# Notes:
+# - Only SOCKS5 proxies are supported.
+# - Lines starting with # are comments and ignored.
+# - Blank lines are ignored.
+# - The app validates each proxy with a short TCP check before use.
+#
+# Examples:
+# 127.0.0.1:1080
+# 203.0.113.10:1080
+# user123:pass456@198.51.100.25:9050
