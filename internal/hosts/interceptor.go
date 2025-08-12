@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"daxwalkerfix/internal/idleexit"
@@ -27,6 +28,7 @@ type Interceptor struct {
 	proxies []*proxy.Proxy
 	debug   bool
 	wg      sync.WaitGroup
+	counter uint64
 }
 
 func New(proxies []*proxy.Proxy, debug bool) *Interceptor {
@@ -76,7 +78,8 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 	
 	var p *proxy.Proxy
 	if len(i.proxies) > 0 {
-		p = i.proxies[time.Now().UnixNano()%int64(len(i.proxies))]
+		index := atomic.AddUint64(&i.counter, 1) - 1
+		p = i.proxies[index%uint64(len(i.proxies))]
 	}
 	
 	if p != nil {
