@@ -14,3 +14,14 @@
 # 127.0.0.1:1080
 # 203.0.113.10:1080
 # user123:pass456@198.51.100.25:9050
+
+206.206.95.183.geo.bottingtools.com:1337:kolief-206.206.95.183:FmHGWPe8TpirmYlsXccSw7Vs
+199.67.112.182.geo.bottingtools.com:1337:kolief-199.67.112.182:FmHGWPe8TpirmYlsXccSw7Vs
+149.40.68.29.geo.bottingtools.com:1337:kolief-149.40.68.29:FmHGWPe8TpirmYlsXccSw7Vs
+31.59.231.170.geo.bottingtools.com:1337:kolief-31.59.231.170:FmHGWPe8TpirmYlsXccSw7Vs
+195.138.103.105.geo.bottingtools.com:1337:kolief-195.138.103.105:FmHGWPe8TpirmYlsXccSw7Vs
+45.56.143.120.geo.bottingtools.com:1337:kolief-45.56.143.120:FmHGWPe8TpirmYlsXccSw7Vs
+172.120.86.37.geo.bottingtools.com:1337:kolief-172.120.86.37:FmHGWPe8TpirmYlsXccSw7Vs
+175.29.80.70.geo.bottingtools.com:1337:kolief-175.29.80.70:FmHGWPe8TpirmYlsXccSw7Vs
+45.196.41.138.geo.bottingtools.com:1337:kolief-45.196.41.138:FmHGWPe8TpirmYlsXccSw7Vs
+156.249.7.184.geo.bottingtools.com:1337:kolief-156.249.7.184:FmHGWPe8TpirmYlsXccSw7Vs

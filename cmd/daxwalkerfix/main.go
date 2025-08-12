@@ -97,7 +97,6 @@ func main() {
 			return
 		case <-statusTicker.C:
 			timeStr := time.Now().Format("15:04:05")
-			fmt.Printf("Status: Active - %s\n", timeStr)
 			output.Info("Status: Active - %s", timeStr)
 		}
 	}
