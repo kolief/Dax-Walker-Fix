@@ -1,0 +1,25 @@
+# Binaries
+*.exe
+*.dll
+*.sys
+
+# Logs
+*.log
+daxwalkerfix.log
+
+# Configuration
+
+# Go build artifacts
+go.sum
+
+
+# OS generated files
+.DS_Store
+Thumbs.db
+nul
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
