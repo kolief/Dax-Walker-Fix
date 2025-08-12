@@ -1,0 +1,30 @@
+# Binaries
+*.exe
+*.dll
+*.sys
+
+# Logs
+*.log
+daxwalkerfix.log
+
+# Configuration
+proxy.txt
+
+# Go build artifacts
+go.sum
+
+# Claude related files
+CLAUDE.md
+.claude/
+claude-*
+*claude*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
