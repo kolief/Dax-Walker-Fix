@@ -30,7 +30,7 @@ func main() {
 
     ensureProxyTemplate()
 
-	fmt.Print("Loading proxies...")
+	fmt.Println("Loading proxies...")
 	output.Info("Loading proxies...")
 
     proxies, err := proxy.LoadAuto()

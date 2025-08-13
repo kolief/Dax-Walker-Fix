@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -154,51 +152,82 @@ func (i *Interceptor) connectViaSocks5(addr string, p *proxy.Proxy) (net.Conn, e
 }
 
 func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, error) {
-	proxyURL := &url.URL{
-		Scheme: "http",
-		Host:   p.Address,
-	}
-	
-	if p.Auth != nil {
-		proxyURL.User = p.Auth
-	}
-	
-	proxyConn, err := net.DialTimeout("tcp", p.Address, 30*time.Second)
+	conn, err := net.DialTimeout("tcp", p.Address, 30*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to proxy: %v", err)
 	}
 	
-	connectReq := &http.Request{
-		Method: "CONNECT",
-		URL:    &url.URL{Opaque: addr},
-		Host:   addr,
-		Header: make(http.Header),
-	}
+	connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n", addr, addr)
 	
 	if p.Auth != nil {
-		if password, ok := p.Auth.Password(); ok {
-			connectReq.SetBasicAuth(p.Auth.Username(), password)
-		}
+		username := p.Auth.Username()
+		password, _ := p.Auth.Password()
+		auth := fmt.Sprintf("%s:%s", username, password)
+		encoded := encodeBase64(auth)
+		connectReq += fmt.Sprintf("Proxy-Authorization: Basic %s\r\n", encoded)
 	}
 	
-	if err := connectReq.Write(proxyConn); err != nil {
-		proxyConn.Close()
+	connectReq += "\r\n"
+	
+	_, err = conn.Write([]byte(connectReq))
+	if err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("failed to send CONNECT request: %v", err)
 	}
 	
-	resp, err := http.ReadResponse(bufio.NewReader(proxyConn), connectReq)
+	reader := bufio.NewReader(conn)
+	resp, _, err := reader.ReadLine()
 	if err != nil {
-		proxyConn.Close()
+		conn.Close()
 		return nil, fmt.Errorf("failed to read CONNECT response: %v", err)
 	}
-	defer resp.Body.Close()
 	
-    if resp.StatusCode != 200 {
-        proxyConn.Close()
-        return nil, fmt.Errorf("proxy returned status %d", resp.StatusCode)
-    }
+	if !strings.Contains(string(resp), "200") {
+		conn.Close()
+		return nil, fmt.Errorf("CONNECT failed: %s", string(resp))
+	}
+	
+	for {
+		line, _, err := reader.ReadLine()
+		if err != nil || len(line) == 0 {
+			break
+		}
+	}
+	
+	return conn, nil
+}
 
-    return proxyConn, nil
+func encodeBase64(s string) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	var result strings.Builder
+	
+	for i := 0; i < len(s); i += 3 {
+		b1, b2, b3 := byte(0), byte(0), byte(0)
+		if i < len(s) {
+			b1 = s[i]
+		}
+		if i+1 < len(s) {
+			b2 = s[i+1]
+		}
+		if i+2 < len(s) {
+			b3 = s[i+2]
+		}
+		
+		result.WriteByte(chars[(b1>>2)&0x3F])
+		result.WriteByte(chars[((b1<<4)|(b2>>4))&0x3F])
+		if i+1 < len(s) {
+			result.WriteByte(chars[((b2<<2)|(b3>>6))&0x3F])
+		} else {
+			result.WriteByte('=')
+		}
+		if i+2 < len(s) {
+			result.WriteByte(chars[b3&0x3F])
+		} else {
+			result.WriteByte('=')
+		}
+	}
+	
+	return result.String()
 }
 
 func (i *Interceptor) addHostsEntry() error {
