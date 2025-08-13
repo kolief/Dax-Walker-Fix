@@ -24,8 +24,13 @@ func Start(ctx context.Context, limit time.Duration, cancelFunc context.CancelFu
 	cancel = cancelFunc
 	mu.Unlock()
 
-	fmt.Printf("Idle timeout: %v\n", limit)
-	output.Info("Idle timeout: %v", limit)
+	if limit == 0 {
+		fmt.Println("Idle timeout: disabled")
+		output.Info("Idle timeout: disabled")
+	} else {
+		fmt.Printf("Idle timeout: %v\n", limit)
+		output.Info("Idle timeout: %v", limit)
+	}
 
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
@@ -38,7 +43,7 @@ func Start(ctx context.Context, limit time.Duration, cancelFunc context.CancelFu
 			case <-ticker.C:
 				mu.Lock()
 				since := time.Since(lastActivity)
-				if since >= timeout {
+				if timeout > 0 && since >= timeout {
 					fmt.Printf("Idle timeout reached, exiting\n")
 					output.Info("Idle timeout reached, exiting")
 					mu.Unlock()
