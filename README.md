@@ -1,6 +1,6 @@
 # Dax Walker Fix
 
-Redirects walker.dax.cloud traffic through SOCKS5 proxies to bypass rate limiting.
+Redirects walker.dax.cloud traffic through SOCKS5 or HTTPS proxies to bypass rate limiting.
 
 ## Download
 
@@ -10,12 +10,20 @@ Or build from source: `build.bat`
 
 ## Setup
 
-Edit `proxy.txt` with your SOCKS5 proxies:
+Create `proxy.txt` on your Desktop with your SOCKS5 or HTTPS proxies:
+The app looks for `proxy.txt` on your Desktop. If it doesn't find one, it will create a starter file there for you.
+
+You can also paste proxies without a type. On startup the app will ask if these are SOCKS5 or HTTPS and use that for all untyped lines.
 
 ```
-192.168.1.100:1080:username:password
+socks5:127.0.0.1:9050
+https:proxy.example.com:3128
 127.0.0.1:9050
+proxy.example.com:3128
+10.0.0.5:1080:username:password
 ```
+
+
 
 ## Usage
 

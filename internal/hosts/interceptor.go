@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -83,14 +85,22 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 	}
 	
 	if p != nil {
-		output.Info("Connection to %s via proxy %s", domain, p.Address)
+		proxyType := "SOCKS5"
+		if p.Type == proxy.HTTPS {
+			proxyType = "HTTPS"
+		}
+		output.Info("Connection to %s via %s proxy %s", domain, proxyType, p.Address)
 	} else {
 		output.Info("Connection to %s direct", domain)
 	}
 	
 	if i.debug {
 		if p != nil {
-			fmt.Printf("Connection -> %s via proxy\n", domain)
+			proxyType := "SOCKS5"
+			if p.Type == proxy.HTTPS {
+				proxyType = "HTTPS"
+			}
+			fmt.Printf("Connection -> %s via %s proxy\n", domain, proxyType)
 		} else {
 			fmt.Printf("Connection -> %s direct\n", domain)
 		}
@@ -114,6 +124,17 @@ func (i *Interceptor) connectTo(addr string, p *proxy.Proxy) (net.Conn, error) {
 		return net.DialTimeout("tcp", addr, 30*time.Second)
 	}
 	
+	switch p.Type {
+	case proxy.SOCKS5:
+		return i.connectViaSocks5(addr, p)
+	case proxy.HTTPS:
+		return i.connectViaHTTPS(addr, p)
+	default:
+		return nil, fmt.Errorf("unsupported proxy type")
+	}
+}
+
+func (i *Interceptor) connectViaSocks5(addr string, p *proxy.Proxy) (net.Conn, error) {
 	var auth *socks.Auth
 	if p.Auth != nil {
 		if password, ok := p.Auth.Password(); ok {
@@ -130,6 +151,54 @@ func (i *Interceptor) connectTo(addr string, p *proxy.Proxy) (net.Conn, error) {
 	}
 	
 	return dialer.Dial("tcp", addr)
+}
+
+func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, error) {
+	proxyURL := &url.URL{
+		Scheme: "http",
+		Host:   p.Address,
+	}
+	
+	if p.Auth != nil {
+		proxyURL.User = p.Auth
+	}
+	
+	proxyConn, err := net.DialTimeout("tcp", p.Address, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to proxy: %v", err)
+	}
+	
+	connectReq := &http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{Opaque: addr},
+		Host:   addr,
+		Header: make(http.Header),
+	}
+	
+	if p.Auth != nil {
+		if password, ok := p.Auth.Password(); ok {
+			connectReq.SetBasicAuth(p.Auth.Username(), password)
+		}
+	}
+	
+	if err := connectReq.Write(proxyConn); err != nil {
+		proxyConn.Close()
+		return nil, fmt.Errorf("failed to send CONNECT request: %v", err)
+	}
+	
+	resp, err := http.ReadResponse(bufio.NewReader(proxyConn), connectReq)
+	if err != nil {
+		proxyConn.Close()
+		return nil, fmt.Errorf("failed to read CONNECT response: %v", err)
+	}
+	defer resp.Body.Close()
+	
+    if resp.StatusCode != 200 {
+        proxyConn.Close()
+        return nil, fmt.Errorf("proxy returned status %d", resp.StatusCode)
+    }
+
+    return proxyConn, nil
 }
 
 func (i *Interceptor) addHostsEntry() error {
