@@ -14,6 +14,7 @@ import (
 	"daxwalkerfix/internal/idleexit"
 	"daxwalkerfix/internal/output"
 	"daxwalkerfix/internal/proxy"
+	"daxwalkerfix/internal/updater"
 )
 
 func main() {
@@ -27,6 +28,8 @@ func main() {
 	fmt.Println()
 	output.Info("Dax Walker Fix by Kolief - Hosts file interceptor")
 	output.Info("Redirects walker.dax.cloud through proxies")
+
+	updater.Check()
 
     ensureProxyTemplate()
 
