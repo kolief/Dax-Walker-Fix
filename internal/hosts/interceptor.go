@@ -3,13 +3,14 @@ package hosts
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"daxwalkerfix/internal/idleexit"
@@ -28,7 +29,6 @@ type Interceptor struct {
 	proxies []*proxy.Proxy
 	debug   bool
 	wg      sync.WaitGroup
-	counter uint64
 }
 
 func New(proxies []*proxy.Proxy, debug bool) *Interceptor {
@@ -76,50 +76,45 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 	
 	idleexit.Reset()
 	
-	var p *proxy.Proxy
-	if len(i.proxies) > 0 {
-		index := atomic.AddUint64(&i.counter, 1) - 1
-		p = i.proxies[index%uint64(len(i.proxies))]
-	}
-	
-	if p != nil {
-		proxyType := "SOCKS5"
-		if p.Type == proxy.HTTPS {
-			proxyType = "HTTPS"
+	for attempt := 0; attempt < 3; attempt++ {
+		var p *proxy.Proxy
+		if len(i.proxies) > 0 {
+			index := rand.Intn(len(i.proxies))
+			p = i.proxies[index]
 		}
-		output.Info("Connection to %s via %s proxy %s", domain, proxyType, p.Address)
-	} else {
-		output.Info("Connection to %s direct", domain)
-	}
-	
-	if i.debug {
+		
 		if p != nil {
 			proxyType := "SOCKS5"
 			if p.Type == proxy.HTTPS {
 				proxyType = "HTTPS"
 			}
-			fmt.Printf("Connection -> %s via %s proxy\n", domain, proxyType)
+			output.Info("Connection to %s via %s proxy %s", domain, proxyType, p.Address)
 		} else {
-			fmt.Printf("Connection -> %s direct\n", domain)
+			output.Info("Connection to %s direct", domain)
 		}
-	}
-	
-	target, err := i.connectTo(domain+":443", p)
-	if err != nil {
-		if i.debug {
-			fmt.Printf("Failed to connect: %v\n", err)
+		
+		target, err := i.connectTo(domain+":443", p)
+		if err != nil {
+			if i.debug {
+				fmt.Printf("Connection failed: %v\n", err)
+			}
+			continue
 		}
+		defer target.Close()
+		
+		go io.Copy(target, client)
+		io.Copy(client, target)
 		return
 	}
-	defer target.Close()
 	
-	go io.Copy(target, client)
-	io.Copy(client, target)
+	if i.debug {
+		fmt.Printf("All connection attempts failed\n")
+	}
 }
 
 func (i *Interceptor) connectTo(addr string, p *proxy.Proxy) (net.Conn, error) {
 	if p == nil {
-		return net.DialTimeout("tcp", addr, 30*time.Second)
+		return net.DialTimeout("tcp", addr, 1*time.Second)
 	}
 	
 	switch p.Type {
@@ -143,7 +138,8 @@ func (i *Interceptor) connectViaSocks5(addr string, p *proxy.Proxy) (net.Conn, e
 		}
 	}
 	
-	dialer, err := socks.SOCKS5("tcp", p.Address, auth, socks.Direct)
+	baseDialer := &net.Dialer{Timeout: 1 * time.Second}
+	dialer, err := socks.SOCKS5("tcp", p.Address, auth, baseDialer)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +148,7 @@ func (i *Interceptor) connectViaSocks5(addr string, p *proxy.Proxy) (net.Conn, e
 }
 
 func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", p.Address, 30*time.Second)
+	conn, err := net.DialTimeout("tcp", p.Address, 1*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to proxy: %v", err)
 	}
@@ -163,7 +159,7 @@ func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, er
 		username := p.Auth.Username()
 		password, _ := p.Auth.Password()
 		auth := fmt.Sprintf("%s:%s", username, password)
-		encoded := encodeBase64(auth)
+		encoded := base64.StdEncoding.EncodeToString([]byte(auth))
 		connectReq += fmt.Sprintf("Proxy-Authorization: Basic %s\r\n", encoded)
 	}
 	
@@ -197,38 +193,6 @@ func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, er
 	return conn, nil
 }
 
-func encodeBase64(s string) string {
-	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-	var result strings.Builder
-	
-	for i := 0; i < len(s); i += 3 {
-		b1, b2, b3 := byte(0), byte(0), byte(0)
-		if i < len(s) {
-			b1 = s[i]
-		}
-		if i+1 < len(s) {
-			b2 = s[i+1]
-		}
-		if i+2 < len(s) {
-			b3 = s[i+2]
-		}
-		
-		result.WriteByte(chars[(b1>>2)&0x3F])
-		result.WriteByte(chars[((b1<<4)|(b2>>4))&0x3F])
-		if i+1 < len(s) {
-			result.WriteByte(chars[((b2<<2)|(b3>>6))&0x3F])
-		} else {
-			result.WriteByte('=')
-		}
-		if i+2 < len(s) {
-			result.WriteByte(chars[b3&0x3F])
-		} else {
-			result.WriteByte('=')
-		}
-	}
-	
-	return result.String()
-}
 
 func (i *Interceptor) addHostsEntry() error {
 	lines, err := i.readHosts()

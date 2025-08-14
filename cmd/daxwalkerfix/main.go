@@ -39,15 +39,15 @@ func main() {
     proxies, err := proxy.LoadAuto()
 	if err != nil {
 		fmt.Printf("FAILED: %v\n", err)
-		fmt.Println("\nMake sure proxy.txt exists on your Desktop with working proxies.")
+		fmt.Println("\nMake sure proxy.txt exists on your Desktop with proxies.")
 		fmt.Println("Press Enter to exit...")
 		output.Error("Failed to load proxies: %v", err)
-		output.Info("Make sure proxy.txt exists on Desktop with working proxies")
+		output.Info("Make sure proxy.txt exists on Desktop with proxies")
 		fmt.Scanln()
 		os.Exit(1)
 	}
-	fmt.Printf(" found %d working proxies\n", len(proxies))
-	output.Info("Found %d working proxies", len(proxies))
+	fmt.Printf(" found %d proxies\n", len(proxies))
+	output.Info("Found %d proxies", len(proxies))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -136,7 +136,7 @@ const ProxyTemplate = `# SOCKS5 OR HTTPS proxy list (one per line)
 # - Only SOCKS5 or HTTPS proxies are supported.
 # - Lines starting with # are comments and ignored.
 # - Blank lines are ignored.
-# - The app validates each proxy with a short TCP check before use.
+# - Proxies are tested when used, not at startup.
 #
 # Examples:
 # 127.0.0.1:1080
