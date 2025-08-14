@@ -50,6 +50,7 @@ func (i *Interceptor) Start(ctx context.Context) error {
 	}
 	defer listener.Close()
 
+	output.Info("Listening on 127.0.0.1:443 for %s traffic", domain)
 	if i.debug {
 		fmt.Printf("Listening on 127.0.0.1:443 for %s traffic\n", domain)
 	}
@@ -95,6 +96,7 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 		
 		target, err := i.connectTo(domain+":443", p)
 		if err != nil {
+			output.Info("Connection failed: %v", err)
 			if i.debug {
 				fmt.Printf("Connection failed: %v\n", err)
 			}
@@ -107,6 +109,7 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 		return
 	}
 	
+	output.Info("All connection attempts failed")
 	if i.debug {
 		fmt.Printf("All connection attempts failed\n")
 	}
