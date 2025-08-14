@@ -1,70 +1,45 @@
 package updater
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 type Release struct {
 	Assets []struct {
 		Name        string `json:"name"`
 		DownloadURL string `json:"browser_download_url"`
+		Size        int64  `json:"size"`
 	} `json:"assets"`
 }
 
-func GetFileChecksum(filename string) string {
-	file, err := os.Open(filename)
+func getFileSize(filename string) int64 {
+	info, err := os.Stat(filename)
 	if err != nil {
-		return ""
+		return 0
 	}
-	defer file.Close()
-
-	hash := sha256.New()
-	io.Copy(hash, file)
-	return hex.EncodeToString(hash.Sum(nil))
+	return info.Size()
 }
 
-func GetRemoteChecksum() string {
+func getLatestRelease() *Release {
 	resp, err := http.Get("https://api.github.com/repos/kolief/Dax-Walker-Fix/releases/latest")
 	if err != nil {
-		return ""
+		return nil
 	}
 	defer resp.Body.Close()
 
 	var release Release
 	json.NewDecoder(resp.Body).Decode(&release)
-
-	for _, asset := range release.Assets {
-		if asset.Name == "daxwalkerfix.exe" {
-			resp2, err := http.Get(asset.DownloadURL)
-			if err != nil {
-				return ""
-			}
-			defer resp2.Body.Close()
-
-			hash := sha256.New()
-			io.Copy(hash, resp2.Body)
-			return hex.EncodeToString(hash.Sum(nil))
-		}
-	}
-	return ""
+	return &release
 }
 
-func DownloadUpdate() bool {
-	resp, err := http.Get("https://api.github.com/repos/kolief/Dax-Walker-Fix/releases/latest")
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-
-	var release Release
-	json.NewDecoder(resp.Body).Decode(&release)
-
+func downloadUpdate(release *Release) bool {
 	var downloadURL string
 	for _, asset := range release.Assets {
 		if asset.Name == "daxwalkerfix.exe" {
@@ -77,39 +52,80 @@ func DownloadUpdate() bool {
 		return false
 	}
 
-	resp2, err := http.Get(downloadURL)
+	resp, err := http.Get(downloadURL)
 	if err != nil {
 		return false
 	}
-	defer resp2.Body.Close()
+	defer resp.Body.Close()
 
-	file, err := os.Create("daxwalkerfix_new.exe")
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+	newFile := filepath.Join(exeDir, "daxwalkerfix_new.exe")
+	
+	file, err := os.Create(newFile)
 	if err != nil {
 		return false
 	}
 	defer file.Close()
 
-	io.Copy(file, resp2.Body)
-
-	currentExe, _ := os.Executable()
-	os.Rename(currentExe, "daxwalkerfix_old.exe")
-	os.Rename("daxwalkerfix_new.exe", "daxwalkerfix.exe")
-	os.Remove("daxwalkerfix_old.exe")
+	io.Copy(file, resp.Body)
 
 	return true
 }
 
-func Check() {
-	currentHash := GetFileChecksum("daxwalkerfix.exe")
-	remoteHash := GetRemoteChecksum()
+func updateExe() {
+	exePath, _ := os.Executable()
+	exeDir := filepath.Dir(exePath)
+	exeName := filepath.Base(exePath)
+	
+	batchContent := fmt.Sprintf(`@echo off
+cd /d "%s"
+timeout /t 3 /nobreak > nul
+if exist "daxwalkerfix_new.exe" (
+    if exist "%s" (
+        del "%s"
+    )
+    ren "daxwalkerfix_new.exe" "%s"
+)
+del "%%~f0"`, exeDir, exeName, exeName, exeName)
 
-	if currentHash != remoteHash && remoteHash != "" {
+	batchFile := filepath.Join(exeDir, "update.bat")
+	ioutil.WriteFile(batchFile, []byte(batchContent), 0644)
+	exec.Command("cmd", "/C", batchFile).Start()
+	os.Exit(0)
+}
+
+func Check() {
+	release := getLatestRelease()
+	if release == nil {
+		fmt.Println("Failed to check for updates")
+		return
+	}
+
+	var remoteSize int64
+	for _, asset := range release.Assets {
+		if asset.Name == "daxwalkerfix.exe" {
+			remoteSize = asset.Size
+			break
+		}
+	}
+
+	if remoteSize == 0 {
+		fmt.Println("No release found")
+		return
+	}
+
+	exePath, _ := os.Executable()
+	currentSize := getFileSize(exePath)
+
+	if currentSize != remoteSize {
 		fmt.Print("Update available. Download? (y/n): ")
 		var answer string
 		fmt.Scanln(&answer)
 		if answer == "y" {
-			if DownloadUpdate() {
-				fmt.Println("Updated successfully")
+			if downloadUpdate(release) {
+				fmt.Println("Update downloaded, restarting...")
+				updateExe()
 			} else {
 				fmt.Println("Update failed")
 			}
