@@ -117,7 +117,4 @@ func Load() ([]*Proxy, error) {
 	return proxies, nil
 }
 
-func LoadAuto() ([]*Proxy, error) {
-	return Load()
-}
 

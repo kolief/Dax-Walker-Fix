@@ -36,7 +36,7 @@ func main() {
 	fmt.Println("Loading proxies...")
 	output.Info("Loading proxies...")
 
-    proxies, err := proxy.LoadAuto()
+    proxies, err := proxy.Load()
 	if err != nil {
 		fmt.Printf("FAILED: %v\n", err)
 		fmt.Println("\nMake sure proxy.txt exists on your Desktop with proxies.")
