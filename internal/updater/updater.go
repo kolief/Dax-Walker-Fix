@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"daxwalkerfix/internal/output"
 )
 
 type Release struct {
@@ -99,6 +101,7 @@ func Check() {
 	release := getLatestRelease()
 	if release == nil {
 		fmt.Println("Failed to check for updates")
+		output.Info("Failed to check for updates")
 		return
 	}
 
@@ -112,6 +115,7 @@ func Check() {
 
 	if remoteSize == 0 {
 		fmt.Println("No release found")
+		output.Info("No release found")
 		return
 	}
 
@@ -125,12 +129,15 @@ func Check() {
 		if answer == "y" {
 			if downloadUpdate(release) {
 				fmt.Println("Update downloaded, restarting...")
+				output.Info("Update downloaded, restarting...")
 				updateExe()
 			} else {
 				fmt.Println("Update failed")
+				output.Info("Update failed")
 			}
 		}
 	} else {
 		fmt.Println("Up to date")
+		output.Info("Up to date")
 	}
 }
