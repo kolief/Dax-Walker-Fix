@@ -24,6 +24,13 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
+REM Build icon resources if available
+if exist "cmd\daxwalkerfix\icon.ico" (
+    echo Embedding icon...
+    go install github.com/akavel/rsrc@latest >nul 2>&1
+    rsrc -ico cmd\daxwalkerfix\icon.ico -o cmd\daxwalkerfix\rsrc.syso >nul 2>&1
+)
+
 REM Build the executable with optimizations
 echo Building optimized executable...
 go build -ldflags "-s -w" -o daxwalkerfix.exe ./cmd/daxwalkerfix

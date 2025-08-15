@@ -25,10 +25,8 @@ func Start(ctx context.Context, limit time.Duration, cancelFunc context.CancelFu
 	mu.Unlock()
 
 	if limit == 0 {
-		fmt.Println("Idle timeout: disabled")
 		output.Info("Idle timeout: disabled")
 	} else {
-		fmt.Printf("Idle timeout: %v\n", limit)
 		output.Info("Idle timeout: %v", limit)
 	}
 

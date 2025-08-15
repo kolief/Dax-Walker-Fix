@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
+
+	fileselect "daxwalkerfix/internal/file"
 )
 
 type ProxyType int
@@ -22,20 +23,30 @@ type Proxy struct {
 }
 
 func Load() ([]*Proxy, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to locate user home: %v", err)
+	var path string
+	var rememberedType int
+	
+	rememberedPath, rememberedType := fileselect.LoadPathWithType()
+	if rememberedPath != "" {
+		path = rememberedPath
+	} else {
+		fmt.Println("Select proxy.txt file...")
+		selectedPath, err := fileselect.SelectProxyFile()
+		if err != nil {
+			return nil, fmt.Errorf("failed to select proxy file: %v", err)
+		}
+		path = selectedPath
+		rememberedType = -1
 	}
 
-	path := filepath.Join(home, "Desktop", "proxy.txt")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read proxy.txt from Desktop: %v", err)
+		return nil, fmt.Errorf("failed to read proxy file: %v", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	needsChoice := false
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -49,14 +60,18 @@ func Load() ([]*Proxy, error) {
 
 	var userType ProxyType
 	if needsChoice {
-		fmt.Println("Choose proxy type: 1) SOCKS5  2) HTTPS")
-		fmt.Print("Enter 1 or 2: ")
-		var choice string
-		fmt.Scanln(&choice)
-		if choice == "2" {
-			userType = HTTPS
+		if rememberedType != -1 {
+			userType = ProxyType(rememberedType)
 		} else {
-			userType = SOCKS5
+			fmt.Println("Choose proxy type: 1) SOCKS5  2) HTTPS")
+			fmt.Print("Enter 1 or 2: ")
+			var choice string
+			fmt.Scanln(&choice)
+			if choice == "2" {
+				userType = HTTPS
+			} else {
+				userType = SOCKS5
+			}
 		}
 	}
 
@@ -114,7 +129,6 @@ func Load() ([]*Proxy, error) {
 		return nil, fmt.Errorf("no proxies found")
 	}
 
+	fileselect.SavePathWithType(path, int(userType))
 	return proxies, nil
 }
-
-

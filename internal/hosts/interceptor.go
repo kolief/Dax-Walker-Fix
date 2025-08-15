@@ -16,6 +16,7 @@ import (
 	"daxwalkerfix/internal/idleexit"
 	"daxwalkerfix/internal/output"
 	"daxwalkerfix/internal/proxy"
+
 	socks "golang.org/x/net/proxy"
 )
 
@@ -29,6 +30,7 @@ type Interceptor struct {
 	proxies []*proxy.Proxy
 	debug   bool
 	wg      sync.WaitGroup
+	mu      sync.RWMutex
 }
 
 func New(proxies []*proxy.Proxy, debug bool) *Interceptor {
@@ -36,6 +38,16 @@ func New(proxies []*proxy.Proxy, debug bool) *Interceptor {
 		proxies: proxies,
 		debug:   debug,
 	}
+}
+
+func (i *Interceptor) UpdateProxies(proxies []*proxy.Proxy) {
+	i.mu.Lock()
+	i.proxies = proxies
+	i.mu.Unlock()
+}
+
+func (i *Interceptor) TestProxy(addr string, p *proxy.Proxy) (net.Conn, error) {
+	return i.connectTo(addr, p)
 }
 
 func (i *Interceptor) Start(ctx context.Context) error {
@@ -49,11 +61,6 @@ func (i *Interceptor) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to listen on port 443: %v", err)
 	}
 	defer listener.Close()
-
-	output.Info("Listening on 127.0.0.1:443 for %s traffic", domain)
-	if i.debug {
-		fmt.Printf("Listening on 127.0.0.1:443 for %s traffic\n", domain)
-	}
 
 	go func() {
 		for {
@@ -74,16 +81,18 @@ func (i *Interceptor) Start(ctx context.Context) error {
 func (i *Interceptor) handleConnection(client net.Conn) {
 	defer i.wg.Done()
 	defer client.Close()
-	
+
 	idleexit.Reset()
-	
+
 	for attempt := 0; attempt < 3; attempt++ {
+		i.mu.RLock()
 		var p *proxy.Proxy
 		if len(i.proxies) > 0 {
 			index := rand.Intn(len(i.proxies))
 			p = i.proxies[index]
 		}
-		
+		i.mu.RUnlock()
+
 		if p != nil {
 			proxyType := "SOCKS5"
 			if p.Type == proxy.HTTPS {
@@ -93,7 +102,7 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 		} else {
 			output.Info("Connection to %s direct", domain)
 		}
-		
+
 		target, err := i.connectTo(domain+":443", p)
 		if err != nil {
 			output.Info("Connection failed: %v", err)
@@ -103,12 +112,12 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 			continue
 		}
 		defer target.Close()
-		
+
 		go io.Copy(target, client)
 		io.Copy(client, target)
 		return
 	}
-	
+
 	output.Info("All connection attempts failed")
 	if i.debug {
 		fmt.Printf("All connection attempts failed\n")
@@ -119,7 +128,7 @@ func (i *Interceptor) connectTo(addr string, p *proxy.Proxy) (net.Conn, error) {
 	if p == nil {
 		return net.DialTimeout("tcp", addr, 1*time.Second)
 	}
-	
+
 	switch p.Type {
 	case proxy.SOCKS5:
 		return i.connectViaSocks5(addr, p)
@@ -140,13 +149,13 @@ func (i *Interceptor) connectViaSocks5(addr string, p *proxy.Proxy) (net.Conn, e
 			}
 		}
 	}
-	
+
 	baseDialer := &net.Dialer{Timeout: 1 * time.Second}
 	dialer, err := socks.SOCKS5("tcp", p.Address, auth, baseDialer)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return dialer.Dial("tcp", addr)
 }
 
@@ -155,9 +164,9 @@ func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to proxy: %v", err)
 	}
-	
+
 	connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n", addr, addr)
-	
+
 	if p.Auth != nil {
 		username := p.Auth.Username()
 		password, _ := p.Auth.Password()
@@ -165,50 +174,49 @@ func (i *Interceptor) connectViaHTTPS(addr string, p *proxy.Proxy) (net.Conn, er
 		encoded := base64.StdEncoding.EncodeToString([]byte(auth))
 		connectReq += fmt.Sprintf("Proxy-Authorization: Basic %s\r\n", encoded)
 	}
-	
+
 	connectReq += "\r\n"
-	
+
 	_, err = conn.Write([]byte(connectReq))
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to send CONNECT request: %v", err)
 	}
-	
+
 	reader := bufio.NewReader(conn)
 	resp, _, err := reader.ReadLine()
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to read CONNECT response: %v", err)
 	}
-	
+
 	if !strings.Contains(string(resp), "200") {
 		conn.Close()
 		return nil, fmt.Errorf("CONNECT failed: %s", string(resp))
 	}
-	
+
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil || len(line) == 0 {
 			break
 		}
 	}
-	
+
 	return conn, nil
 }
-
 
 func (i *Interceptor) addHostsEntry() error {
 	lines, err := i.readHosts()
 	if err != nil {
 		return err
 	}
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, domain) && strings.Contains(line, "127.0.0.1") {
 			return nil
 		}
 	}
-	
+
 	lines = append(lines, hostsLine)
 	return i.writeHosts(lines)
 }
@@ -218,7 +226,7 @@ func (i *Interceptor) removeHostsEntry() error {
 	if err != nil {
 		return err
 	}
-	
+
 	var newLines []string
 	for _, line := range lines {
 		if strings.Contains(line, domain) && strings.Contains(line, "DAX_INTERCEPT") {
@@ -226,7 +234,7 @@ func (i *Interceptor) removeHostsEntry() error {
 		}
 		newLines = append(newLines, line)
 	}
-	
+
 	return i.writeHosts(newLines)
 }
 
@@ -236,13 +244,13 @@ func (i *Interceptor) readHosts() ([]string, error) {
 		return nil, err
 	}
 	defer file.Close()
-	
+
 	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
-	
+
 	return lines, scanner.Err()
 }
 
@@ -252,11 +260,11 @@ func (i *Interceptor) writeHosts(lines []string) error {
 		return err
 	}
 	defer file.Close()
-	
+
 	writer := bufio.NewWriter(file)
 	for _, line := range lines {
 		fmt.Fprintln(writer, line)
 	}
-	
+
 	return writer.Flush()
 }

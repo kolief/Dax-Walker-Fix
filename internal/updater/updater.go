@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -92,7 +91,7 @@ if exist "daxwalkerfix_new.exe" (
 del "%%~f0"`, exeDir, exeName, exeName, exeName)
 
 	batchFile := filepath.Join(exeDir, "update.bat")
-	ioutil.WriteFile(batchFile, []byte(batchContent), 0644)
+	os.WriteFile(batchFile, []byte(batchContent), 0644)
 	exec.Command("cmd", "/C", batchFile).Start()
 	os.Exit(0)
 }
