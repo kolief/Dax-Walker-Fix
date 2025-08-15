@@ -1,54 +1,46 @@
 # Dax Walker Fix
-
-Redirects walker.dax.cloud traffic through SOCKS5 or HTTPS proxies to bypass rate limiting.
+Routes walker.dax.cloud through your proxies.
 
 ## Download
-
-**[Download Latest Release](https://github.com/kolief/Dax-Walker-Fix/releases/latest)** - Pre-built executable
-
+[Download Latest Release](https://github.com/kolief/Dax-Walker-Fix/releases/latest) - Pre-built executable
 Or build from source: `build.bat`
 
-## Setup
+## How to use
+1. Run as administrator: `daxwalkerfix.exe`
+2. Select your proxy file when prompted (file dialog opens)
+3. Choose SOCKS5 or HTTPS if asked
 
-Create `proxy.txt` on your Desktop with your SOCKS5 or HTTPS proxies:
-The app looks for `proxy.txt` on your Desktop. If it doesn't find one, it will create a starter file there for you.
+The app remembers your file location and proxy type for next time.
 
-You can also paste proxies without a type. On startup the app will ask if these are SOCKS5 or HTTPS and use that for all untyped lines.
-
+## Proxy file format
 ```
-socks5:127.0.0.1:9050
-https:proxy.example.com:3128
-127.0.0.1:9050
+127.0.0.1:1080
 proxy.example.com:3128
-10.0.0.5:1080:username:password
+user:pass@10.0.0.5:1080
 ```
 
-
-
-## Usage
-
-Run as administrator:
-
+Or specify type:
 ```
-daxwalkerfix.exe
+socks5:127.0.0.1:1080
+https:proxy.example.com:3128
 ```
 
-Options: `-timeout 10` (minutes), `-debug`
-
+## Options
+`-timeout 30` - Auto-exit after 30 minutes of inactivity (default)
 Press Ctrl+C to stop.
 
-## Notes
+## What it does
+- Tests proxies every 5 minutes
+- Removes failed proxies from your file automatically
+- Saves failed proxies to Desktop\DaxWalkerFix\failed_proxies.txt
+- Auto-updates when new version available
+- Remembers your settings in Desktop\DaxWalkerFix\remember.dat
 
+## Notes
 - Modifies Windows hosts file temporarily
 - Runs local server on port 443
 - Logs activity to daxwalkerfix.log
 - Requires admin privileges
 
 ## Antivirus False Positives
-
-Some antivirus software may flag this as malicious due to:
-- Hosts file modification (common in malware)
-- Network interception capabilities
-- Admin privilege requirements
-
-This is a false positive. The tool only redirects walker.dax.cloud traffic and does not collect personal data or perform malicious activities. You can verify this by reviewing the open source code.
+Some antivirus software may flag this as malicious due to hosts file modification and network interception. This is a false positive - the tool only redirects walker.dax.cloud traffic.
