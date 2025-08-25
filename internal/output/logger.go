@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 var logFile *os.File
@@ -20,7 +21,7 @@ func Info(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	log.Printf("[INFO] %s", msg)
 	if logFile != nil {
-		fmt.Fprintf(logFile, "[INFO] %s\n", msg)
+		fmt.Fprintf(logFile, "[%s] [INFO] %s\n", time.Now().Format("15:04:05"), msg)
 	}
 }
 
@@ -28,7 +29,7 @@ func Warn(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	log.Printf("[WARN] %s", msg)
 	if logFile != nil {
-		fmt.Fprintf(logFile, "[WARN] %s\n", msg)
+		fmt.Fprintf(logFile, "[%s] [WARN] %s\n", time.Now().Format("15:04:05"), msg)
 	}
 }
 
@@ -36,6 +37,6 @@ func Error(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	log.Printf("[ERROR] %s", msg)
 	if logFile != nil {
-		fmt.Fprintf(logFile, "[ERROR] %s\n", msg)
+		fmt.Fprintf(logFile, "[%s] [ERROR] %s\n", time.Now().Format("15:04:05"), msg)
 	}
 }

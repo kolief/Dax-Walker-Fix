@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	fileselect "daxwalkerfix/internal/file"
+	"daxwalkerfix/internal/file"
 )
 
 type ProxyType int
@@ -22,18 +22,18 @@ type Proxy struct {
 	Type    ProxyType
 }
 
-func Load() ([]*Proxy, error) {
+func Load() ([]*Proxy, bool, error) {
 	var path string
 	var rememberedType int
 	
-	rememberedPath, rememberedType := fileselect.LoadPathWithType()
+	rememberedPath, rememberedType := file.LoadPathWithType()
 	if rememberedPath != "" {
 		path = rememberedPath
 	} else {
 		fmt.Println("Select proxy.txt file...")
-		selectedPath, err := fileselect.SelectProxyFile()
+		selectedPath, err := file.SelectProxyFile()
 		if err != nil {
-			return nil, fmt.Errorf("failed to select proxy file: %v", err)
+			return nil, false, fmt.Errorf("failed to select proxy file: %v", err)
 		}
 		path = selectedPath
 		rememberedType = -1
@@ -41,7 +41,7 @@ func Load() ([]*Proxy, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read proxy file: %v", err)
+		return nil, false, fmt.Errorf("failed to read proxy file: %v", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -126,9 +126,16 @@ func Load() ([]*Proxy, error) {
 	}
 
 	if len(proxies) == 0 {
-		return nil, fmt.Errorf("no proxies found")
+		return nil, false, fmt.Errorf("no proxies found")
 	}
 
-	fileselect.SavePathWithType(path, int(userType))
-	return proxies, nil
+	fmt.Println("Auto-remove failed proxies? 1) Yes  2) No")
+	fmt.Print("Enter 1 or 2: ")
+	var removeChoice string
+	fmt.Scanln(&removeChoice)
+	autoRemove := removeChoice == "1"
+
+	file.SavePathWithType(path, int(userType))
+	file.SetLastLoadedPath(path)
+	return proxies, autoRemove, nil
 }

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"daxwalkerfix/internal/file"
 	"daxwalkerfix/internal/health"
 	"daxwalkerfix/internal/hosts"
 	"daxwalkerfix/internal/idleexit"
@@ -29,10 +31,10 @@ func main() {
 
 	updater.Check()
 
-	fmt.Println("Loading proxies...")
+	fmt.Println("\nLoading proxies...")
 	output.Info("Loading proxies")
 
-	proxies, err := proxy.Load()
+	proxies, autoRemove, err := proxy.Load()
 	if err != nil {
 		fmt.Printf("FAILED: %v\n", err)
 		fmt.Println("Press Enter to exit")
@@ -40,7 +42,22 @@ func main() {
 		fmt.Scanln()
 		os.Exit(1)
 	}
-	fmt.Printf("Found %d proxies\n", len(proxies))
+	
+	fmt.Printf("Found %d proxies\n\n", len(proxies))
+	fmt.Println("Configuration:")
+	fmt.Printf("├─ Proxy file: %s\n", file.GetLastLoadedPath())
+	if autoRemove {
+		fmt.Println("├─ Auto-remove failed: Yes")
+	} else {
+		fmt.Println("├─ Auto-remove failed: No")
+	}
+	fmt.Printf("├─ Idle timeout: %d minutes\n", *timeout)
+	fmt.Println("└─ Log file: daxwalkerfix.log")
+	
+	fmt.Println("\nNetwork Setup:")
+	fmt.Println("├─ Listening on: 127.0.0.1:443")
+	fmt.Println("├─ Hosts file: Modified")
+	fmt.Println("└─ Target domain: walker.dax.cloud → 127.0.0.1")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -57,7 +74,29 @@ func main() {
 	idleexit.Start(ctx, time.Duration(*timeout)*time.Minute, cancel)
 
 	interceptor := hosts.New(proxies, false)
-	go health.CheckProxies(ctx, proxies, interceptor.UpdateProxies)
+	
+	var workingProxies = len(proxies)
+	var failedProxies = 0
+	
+	printHeader := func() {
+		fmt.Print("\033[H\033[2J")
+		fmt.Println("Dax Walker Fix by Kolief")
+		fmt.Println("Redirects walker.dax.cloud through your proxies")
+		fmt.Println()
+		fmt.Printf("Status: Running | Active: %d | Total: %d | Time: %s\n", 
+			interceptor.GetConnCount(), interceptor.GetTotalConns(), time.Now().Format("15:04:05"))
+		fmt.Printf("Proxies: %d working, %d failed\n", workingProxies, failedProxies)
+		fmt.Println(strings.Repeat("━", 60))
+		fmt.Println("Press Ctrl+C to stop")
+		fmt.Println()
+	}
+
+	updateProxyCount := func(working []*proxy.Proxy, failed int) {
+		workingProxies = len(working)
+		failedProxies += failed
+		printHeader()
+	}
+	go health.CheckProxies(ctx, proxies, file.GetLastLoadedPath(), autoRemove, interceptor.UpdateProxies, updateProxyCount)
 
 	go func() {
 		err := interceptor.Start(ctx)
@@ -88,21 +127,39 @@ func main() {
 	} else {
 		fmt.Printf("Using %d proxies (SOCKS5: %d, HTTPS: %d)\n", len(proxies), socksCount, httpsCount)
 	}
-	fmt.Println("\nStatus: Running (Press Ctrl+C to stop)")
+	
+	fmt.Println("\nProxy Status:")
+	for _, p := range proxies {
+		proxyType := "SOCKS5"
+		if p.Type == proxy.HTTPS {
+			proxyType = "HTTPS"
+		}
+		fmt.Printf("%s (%s) - Ready\n", p.Address, proxyType)
+	}
+	
+	fmt.Printf("\nWorking: %d/%d proxies", len(proxies), len(proxies))
+	if autoRemove {
+		fmt.Print(" | Auto-removal: Enabled")
+	} else {
+		fmt.Print(" | Auto-removal: Disabled")
+	}
+	fmt.Println("\n" + strings.Repeat("━", 70))
 	output.Info("Interceptor running on 127.0.0.1:443 looking for %s", "walker.dax.cloud")
 
-	statusTicker := time.NewTicker(30 * time.Second)
-	defer statusTicker.Stop()
+	printHeader()
+	
+	headerTicker := time.NewTicker(5 * time.Second)
+	defer headerTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\nShutting down...")
+			fmt.Println("\n\nShutting down...")
 			output.Info("Shutting down...")
 			return
-		case <-statusTicker.C:
-			timeStr := time.Now().Format("15:04:05")
-			output.Info("Status: Active - %s", timeStr)
+		case <-headerTicker.C:
+			printHeader()
+			output.Info("Status: Active connections: %d, Total: %d", interceptor.GetConnCount(), interceptor.GetTotalConns())
 		}
 	}
 }

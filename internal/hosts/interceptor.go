@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"daxwalkerfix/internal/idleexit"
@@ -27,10 +28,12 @@ const (
 )
 
 type Interceptor struct {
-	proxies []*proxy.Proxy
-	debug   bool
-	wg      sync.WaitGroup
-	mu      sync.RWMutex
+	proxies     []*proxy.Proxy
+	debug       bool
+	wg          sync.WaitGroup
+	mu          sync.RWMutex
+	connCount   int64
+	totalConns  int64
 }
 
 func New(proxies []*proxy.Proxy, debug bool) *Interceptor {
@@ -48,6 +51,14 @@ func (i *Interceptor) UpdateProxies(proxies []*proxy.Proxy) {
 
 func (i *Interceptor) TestProxy(addr string, p *proxy.Proxy) (net.Conn, error) {
 	return i.connectTo(addr, p)
+}
+
+func (i *Interceptor) GetConnCount() int64 {
+	return atomic.LoadInt64(&i.connCount)
+}
+
+func (i *Interceptor) GetTotalConns() int64 {
+	return atomic.LoadInt64(&i.totalConns)
 }
 
 func (i *Interceptor) Start(ctx context.Context) error {
@@ -81,7 +92,10 @@ func (i *Interceptor) Start(ctx context.Context) error {
 func (i *Interceptor) handleConnection(client net.Conn) {
 	defer i.wg.Done()
 	defer client.Close()
+	defer atomic.AddInt64(&i.connCount, -1)
 
+	atomic.AddInt64(&i.connCount, 1)
+	atomic.AddInt64(&i.totalConns, 1)
 	idleexit.Reset()
 
 	for attempt := 0; attempt < 3; attempt++ {
@@ -98,9 +112,11 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 			if p.Type == proxy.HTTPS {
 				proxyType = "HTTPS"
 			}
-			output.Info("Connection to %s via %s proxy %s", domain, proxyType, p.Address)
+			fmt.Printf("[%s] Connection via %s %s\n", time.Now().Format("15:04:05"), proxyType, p.Address)
+			output.Info("Connection via %s proxy %s", proxyType, p.Address)
 		} else {
-			output.Info("Connection to %s direct", domain)
+			fmt.Printf("[%s] Connection direct\n", time.Now().Format("15:04:05"))
+			output.Info("Connection direct")
 		}
 
 		target, err := i.connectTo(domain+":443", p)

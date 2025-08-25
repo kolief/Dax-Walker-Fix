@@ -1,4 +1,4 @@
-package fileselect
+package file
 
 import (
 	"fmt"
@@ -97,4 +97,14 @@ func LoadPathWithType() (string, int) {
 func LoadPath() string {
 	path, _ := LoadPathWithType()
 	return path
+}
+
+var lastLoadedPath string
+
+func SetLastLoadedPath(path string) {
+	lastLoadedPath = path
+}
+
+func GetLastLoadedPath() string {
+	return lastLoadedPath
 }
