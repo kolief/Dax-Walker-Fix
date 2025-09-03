@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"daxwalkerfix/internal/bandwidth"
 	"daxwalkerfix/internal/idleexit"
 	"daxwalkerfix/internal/output"
 	"daxwalkerfix/internal/proxy"
@@ -129,8 +130,8 @@ func (i *Interceptor) handleConnection(client net.Conn) {
 		}
 		defer target.Close()
 
-		go io.Copy(target, client)
-		io.Copy(client, target)
+		go io.Copy(target, bandwidth.WrapReader(client))
+		io.Copy(bandwidth.WrapWriter(client), target)
 		return
 	}
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"daxwalkerfix/internal/bandwidth"
 	"daxwalkerfix/internal/output"
 )
 
@@ -43,6 +44,7 @@ func Start(ctx context.Context, limit time.Duration, cancelFunc context.CancelFu
 				since := time.Since(lastActivity)
 				if timeout > 0 && since >= timeout {
 					fmt.Printf("Idle timeout reached, exiting\n")
+					bandwidth.LogSession()
 					output.Info("Idle timeout reached, exiting")
 					mu.Unlock()
 					cancel()

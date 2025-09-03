@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"daxwalkerfix/internal/bandwidth"
 	"daxwalkerfix/internal/file"
 	"daxwalkerfix/internal/health"
 	"daxwalkerfix/internal/hosts"
@@ -24,6 +25,7 @@ func main() {
 	flag.Parse()
 
 	output.InitLogger()
+	bandwidth.Init()
 	fmt.Println("Dax Walker Fix by Kolief")
 	fmt.Println("Redirects walker.dax.cloud through your proxies")
 	fmt.Println()
@@ -67,6 +69,7 @@ func main() {
 	go func() {
 		<-sigChan
 		fmt.Println("\nShutting down...")
+		bandwidth.LogSession()
 		output.Info("Shutdown signal received")
 		cancel()
 	}()
@@ -86,6 +89,13 @@ func main() {
 		fmt.Printf("Status: Running | Active: %d | Total: %d | Time: %s\n", 
 			interceptor.GetConnCount(), interceptor.GetTotalConns(), time.Now().Format("15:04:05"))
 		fmt.Printf("Proxies: %d working, %d failed\n", workingProxies, failedProxies)
+		
+		in, out, duration := bandwidth.GetStats()
+		total := in + out
+		fmt.Printf("Bandwidth: %s in, %s out, %s total | Session: %v\n", 
+			bandwidth.FormatBytes(in), bandwidth.FormatBytes(out), bandwidth.FormatBytes(total), 
+			duration.Round(time.Second))
+		
 		fmt.Println(strings.Repeat("━", 60))
 		fmt.Println("Press Ctrl+C to stop")
 		fmt.Println()
@@ -155,6 +165,7 @@ func main() {
 		select {
 		case <-ctx.Done():
 			fmt.Println("\n\nShutting down...")
+			bandwidth.LogSession()
 			output.Info("Shutting down...")
 			return
 		case <-headerTicker.C:
