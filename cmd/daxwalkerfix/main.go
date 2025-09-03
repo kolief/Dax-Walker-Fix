@@ -21,7 +21,7 @@ import (
 )
 
 func main() {
-	timeout := flag.Int("timeout", 30, "Shutdown after N minutes of inactivity")
+	timeout := flag.Int("timeout", 360, "Shutdown after N minutes of inactivity")
 	flag.Parse()
 
 	output.InitLogger()
